@@ -75,7 +75,7 @@ std::string parseJointNameFromResource(const std::string& claimed_interface)
   return claimed_interface.substr(0, index);
 }
 
-MOVEIT_CLASS_FORWARD(Ros2ControlManager);  // Defines Ros2ControlManagerPtr, ConstPtr, WeakPtr... etc
+MOVEIT_CLASS_FORWARD(Ros2ControlManagerFix);  // Defines Ros2ControlManagerPtr, ConstPtr, WeakPtr... etc
 
 /**
  * \brief moveit_controller_manager::Ros2ControlManager sub class that interfaces one ros_control
@@ -83,7 +83,7 @@ MOVEIT_CLASS_FORWARD(Ros2ControlManager);  // Defines Ros2ControlManagerPtr, Con
  * instance.
  * All services and names are relative to ns_.
  */
-class Ros2ControlManager : public moveit_controller_manager::MoveItControllerManager
+class Ros2ControlManagerFix : public moveit_controller_manager::MoveItControllerManager
 {
   std::string ns_;
   pluginlib::ClassLoader<ControllerHandleAllocator> loader_;
@@ -156,7 +156,7 @@ class Ros2ControlManager : public moveit_controller_manager::MoveItControllerMan
     active_controllers_.clear();
 
     auto result = result_future.get();
-    if (!Ros2ControlManager::fixChainedControllers(result))
+    if (!Ros2ControlManagerFix::fixChainedControllers(result))
     {
       return;
     }
@@ -240,7 +240,7 @@ public:
   /**
    * \brief The default constructor. Reads the namespace from ~ros_control_namespace param and defaults to /
    */
-  Ros2ControlManager()
+  Ros2ControlManagerFix()
     : loader_("moveit_ros_control_interface", "moveit_ros_control_interface::ControllerHandleAllocator")
   {
   }
@@ -249,25 +249,26 @@ public:
    * \brief Configure interface with namespace
    * @param ns namespace of ros_control node (without /controller_manager/)
    */
-  [[deprecated("Ros2ControlManager constructor with namespace is deprecated. Set namespace via the "
-               "ros_control_namespace parameter.")]] Ros2ControlManager(const std::string& ns)
+  Ros2ControlManagerFix(const std::string& ns)
     : ns_(ns), loader_("moveit_ros_control_interface", "moveit_ros_control_interface::ControllerHandleAllocator")
   {
-    RCLCPP_INFO_STREAM(LOGGER, "Started moveit_ros_control_interface::Ros2ControlManager for namespace " << ns_);
+    RCLCPP_INFO_STREAM(LOGGER, "Started moveit_ros_control_interface::Ros2ControlManagerFix for namespace " << ns_);
   }
 
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
     node_ = node;
-    // Set the namespace from the ros_control_namespace parameter, or default to "/"
-    if (!node_->has_parameter("ros_control_namespace"))
+    if (ns_.empty())
     {
-      ns_ = node_->declare_parameter<std::string>("ros_control_namespace", "/");
-    }
-    else
-    {
-      node_->get_parameter<std::string>("ros_control_namespace", ns_);
-      RCLCPP_INFO_STREAM(LOGGER, "Namespace for controller manager was specified, namespace: " << ns_);
+      if (node_->has_parameter("ros_control_namespace"))
+      {
+        node_->get_parameter<std::string>("ros_control_namespace", ns_);
+        RCLCPP_INFO_STREAM(LOGGER, "Namespace for controller manager was specified, namespace: " << ns_);
+      }
+      else
+      {
+        ns_ = node_->declare_parameter<std::string>("ros_control_namespace", "/");
+      }
     }
 
     list_controllers_service_ = node_->create_client<controller_manager_msgs::srv::ListControllers>(
@@ -523,9 +524,9 @@ public:
  *  \brief Ros2ControlMultiManager discovers all running ros_control node and delegates member function to the
  * corresponding Ros2ControlManager instances
  */
-class Ros2ControlMultiManager : public moveit_controller_manager::MoveItControllerManager
+class Ros2ControlMultiManagerFix : public moveit_controller_manager::MoveItControllerManager
 {
-  typedef std::map<std::string, moveit_ros_control_interface::Ros2ControlManagerPtr> ControllerManagersMap;
+  typedef std::map<std::string, moveit_ros_control_interface::Ros2ControlManagerFixPtr> ControllerManagersMap;
   ControllerManagersMap controller_managers_;
   rclcpp::Time controller_managers_stamp_{ 0, 0, RCL_ROS_TIME };
   std::mutex controller_managers_mutex_;
@@ -560,7 +561,7 @@ class Ros2ControlMultiManager : public moveit_controller_manager::MoveItControll
         if (controller_managers_.find(ns) == controller_managers_.end())
         {  // create Ros2ControlManager if it does not exist
           RCLCPP_INFO_STREAM(LOGGER, "Adding controller_manager interface for node at namespace " << ns);
-          auto controller_manager = std::make_shared<moveit_ros_control_interface::Ros2ControlManager>(ns);
+          auto controller_manager = std::make_shared<moveit_ros_control_interface::Ros2ControlManagerFix>(ns);
           controller_manager->initialize(node_);
           controller_managers_.insert(std::make_pair(ns, controller_manager));
         }
@@ -609,7 +610,7 @@ public:
     std::unique_lock<std::mutex> lock(controller_managers_mutex_);
     discover();
 
-    for (std::pair<const std::string, moveit_ros_control_interface::Ros2ControlManagerPtr>& controller_manager :
+    for (std::pair<const std::string, moveit_ros_control_interface::Ros2ControlManagerFixPtr>& controller_manager :
          controller_managers_)
     {
       controller_manager.second->getControllersList(names);
@@ -625,7 +626,7 @@ public:
     std::unique_lock<std::mutex> lock(controller_managers_mutex_);
     discover();
 
-    for (std::pair<const std::string, moveit_ros_control_interface::Ros2ControlManagerPtr>& controller_manager :
+    for (std::pair<const std::string, moveit_ros_control_interface::Ros2ControlManagerFixPtr>& controller_manager :
          controller_managers_)
     {
       controller_manager.second->getActiveControllers(names);
@@ -677,7 +678,7 @@ public:
   {
     std::unique_lock<std::mutex> lock(controller_managers_mutex_);
 
-    for (std::pair<const std::string, moveit_ros_control_interface::Ros2ControlManagerPtr>& controller_manager :
+    for (std::pair<const std::string, moveit_ros_control_interface::Ros2ControlManagerFixPtr>& controller_manager :
          controller_managers_)
     {
       if (!controller_manager.second->switchControllers(activate, deactivate))
@@ -689,8 +690,8 @@ public:
 
 }  // namespace moveit_ros_control_interface
 
-PLUGINLIB_EXPORT_CLASS(moveit_ros_control_interface::Ros2ControlManager,
+PLUGINLIB_EXPORT_CLASS(moveit_ros_control_interface::Ros2ControlManagerFix,
                        moveit_controller_manager::MoveItControllerManager);
 
-PLUGINLIB_EXPORT_CLASS(moveit_ros_control_interface::Ros2ControlMultiManager,
+PLUGINLIB_EXPORT_CLASS(moveit_ros_control_interface::Ros2ControlMultiManagerFix,
                        moveit_controller_manager::MoveItControllerManager);
