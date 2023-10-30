@@ -1,0 +1,14 @@
+<class_libraries>
+  <library path="moveit_ros_control_interface_fix">
+    <class name="moveit_ros_control_interface/Ros2ControlManagerFix"
+           type="moveit_ros_control_interface::Ros2ControlManagerFix"
+           base_class_type="moveit_controller_manager::MoveItControllerManager">
+        <description>ros_control controller manager interface for MoveIt</description>
+    </class>
+    <class name="moveit_ros_control_interface/Ros2ControlMultiManagerFix"
+           type="moveit_ros_control_interface::Ros2ControlMultiManagerFix"
+           base_class_type="moveit_controller_manager::MoveItControllerManager">
+        <description>multiple ros_control controller managers interface for MoveIt</description>
+    </class>
+  </library>
+</class_libraries>
